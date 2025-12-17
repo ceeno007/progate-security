@@ -135,7 +135,7 @@ const DashboardScreen = ({ navigation }: any) => {
                         activeOpacity={0.9}
                     >
                         <View style={styles.alertHeaderContent}>
-                            <TriangleAlert color="#fff" fill="#fff" size={20} />
+                            <TriangleAlert color="#fff" size={20} />
                             <Text style={styles.alertText}>{activeAlerts} Active Panic Alert{activeAlerts > 1 ? 's' : ''}</Text>
                             <ChevronRight
                                 color="#fff"
@@ -250,17 +250,17 @@ const DashboardScreen = ({ navigation }: any) => {
 
                         <View style={styles.sosCard}>
                             <Text style={styles.sosLabel}>RESIDENT</Text>
-                            <Text style={styles.sosValue}>{sosList[0]?.name || "Unknown"}</Text>
+                            <Text style={styles.sosValue}>{sosList.length > 0 ? sosList[0].name : "Loading..."}</Text>
 
                             <View style={styles.divider} />
 
                             <Text style={styles.sosLabel}>LOCATION</Text>
-                            <Text style={styles.sosValue}>{sosList[0]?.address || "Unknown"}</Text>
+                            <Text style={styles.sosValue}>{sosList.length > 0 ? sosList[0].address : "Unknown"}</Text>
 
                             <View style={styles.divider} />
 
                             <Text style={styles.sosLabel}>TIME</Text>
-                            <Text style={styles.sosValue}>{sosList[0]?.time || "Just Now"}</Text>
+                            <Text style={styles.sosValue}>{sosList.length > 0 ? sosList[0].time : "Just Now"}</Text>
                         </View>
 
                         <Button
