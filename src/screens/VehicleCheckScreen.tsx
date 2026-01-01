@@ -5,7 +5,7 @@ import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useThemeColors, SPACING } from '../theme';
 import { ChevronLeft, Car, Search, ShieldCheck, ShieldAlert } from 'lucide-react-native';
-import { vehiclesApi, VehicleInfo } from '../api';
+import { vehiclesApi, VehicleInfo, storage } from '../api';
 
 const VehicleCheckScreen = ({ navigation }: any) => {
     const [plateNumber, setPlateNumber] = useState('');
@@ -26,6 +26,13 @@ const VehicleCheckScreen = ({ navigation }: any) => {
         try {
             const data = await vehiclesApi.checkPlate(plateNumber);
             setResult(data);
+
+            // Log Activity
+            await storage.addActivity({
+                type: 'VEHICLE',
+                title: 'Vehicle Checked',
+                subtitle: `${data.plate_number} • ${data.status}`
+            });
         } catch (error: any) {
             Alert.alert('Search Failed', error.message || 'Could not find vehicle details.');
         } finally {

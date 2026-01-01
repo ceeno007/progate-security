@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert, Modal, Image } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert, Modal, Image, TouchableOpacity, Animated, PanResponder, Dimensions } from 'react-native';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useThemeColors, SPACING, SHADOWS } from '../theme';
-import { ChevronLeft, CheckCircle, XCircle, MapPin, Search } from 'lucide-react-native';
+import { ChevronLeft, Search } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { accessApi } from '../api';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const VerifyCodeScreen = ({ navigation }: any) => {
     const [code, setCode] = useState('');
@@ -14,6 +15,41 @@ const VerifyCodeScreen = ({ navigation }: any) => {
     const [result, setResult] = useState<any>(null);
     const [checkInLoading, setCheckInLoading] = useState(false);
     const colors = useThemeColors();
+    const screenHeight = Dimensions.get('window').height;
+    const slideAnim = useRef(new Animated.Value(screenHeight)).current;
+
+    useEffect(() => {
+        if (result) {
+            slideAnim.setValue(screenHeight);
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 5
+            }).start();
+        }
+    }, [result]);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dy > 0) {
+                    slideAnim.setValue(gestureState.dy);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                if (gestureState.dy > 100) {
+                    reset();
+                } else {
+                    Animated.spring(slideAnim, {
+                        toValue: 0,
+                        useNativeDriver: true
+                    }).start();
+                }
+            }
+        })
+    ).current;
 
     const handleVerify = async () => {
         if (!code) {
@@ -77,8 +113,14 @@ const VerifyCodeScreen = ({ navigation }: any) => {
     };
 
     const reset = () => {
-        setResult(null);
-        setCode('');
+        Animated.timing(slideAnim, {
+            toValue: screenHeight,
+            duration: 250,
+            useNativeDriver: true
+        }).start(() => {
+            setResult(null);
+            setCode('');
+        });
     };
 
     return (
@@ -121,14 +163,51 @@ const VerifyCodeScreen = ({ navigation }: any) => {
                 </View>
             </TouchableWithoutFeedback>
 
-            {/* Result Modal - Reusing logic from ScanScreen for consistency */}
-            <Modal visible={!!result} transparent animationType="slide">
-                <View style={styles.modalContainer}>
-                    <BlurView intensity={Platform.OS === 'ios' ? 20 : 0} style={StyleSheet.absoluteFill} tint="dark" />
-                    <View style={[styles.resultCard, { backgroundColor: colors.surface }]}>
+            <Modal
+                visible={!!result}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={reset}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={reset}
+                >
+                    <Animated.View
+                        style={[
+                            styles.resultCard,
+                            {
+                                backgroundColor: colors.surface,
+                                overflow: 'visible',
+                                transform: [{ translateY: slideAnim }]
+                            }
+                        ]}
+                        {...panResponder.panHandlers}
+                    >
+                        {/* Drag Handle */}
+                        <View style={{ width: '100%', alignItems: 'center', paddingVertical: 8 }}>
+                            <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+                        </View>
+
+                        {/* Close Button - Floating on top right */}
+                        <TouchableOpacity
+                            onPress={reset}
+                            style={{
+                                position: 'absolute',
+                                right: 12,
+                                top: 12,
+                                zIndex: 9999,
+                                backgroundColor: 'rgba(0,0,0,0.2)',
+                                borderRadius: 20,
+                            }}
+                            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                        >
+                            <Ionicons name="close-circle" size={36} color="#fff" />
+                        </TouchableOpacity>
 
                         <View style={[styles.resultHeader, { backgroundColor: result?.valid ? colors.success : colors.danger }]}>
-                            {result?.valid ? <CheckCircle color="#fff" size={28} /> : <XCircle color="#fff" size={28} />}
+                            {result?.valid ? <Ionicons name="checkmark-circle" color="#fff" size={28} /> : <Ionicons name="close-circle" color="#fff" size={28} />}
                             <Text style={styles.resultTitle}>{result?.valid ? 'Access Granted' : 'Access Denied'}</Text>
                         </View>
 
@@ -153,7 +232,7 @@ const VerifyCodeScreen = ({ navigation }: any) => {
 
                             {result?.details?.destination && (
                                 <View style={styles.infoRow}>
-                                    <MapPin size={16} color={colors.textSecondary} />
+                                    <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
                                     <Text style={[styles.infoText, { color: colors.textSecondary }]}>{result.details.destination}</Text>
                                 </View>
                             )}
@@ -186,8 +265,8 @@ const VerifyCodeScreen = ({ navigation }: any) => {
                                 />
                             </View>
                         </View>
-                    </View>
-                </View>
+                    </Animated.View>
+                </TouchableOpacity>
             </Modal>
         </ScreenWrapper>
     );
@@ -312,6 +391,11 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: 'bold',
         textAlign: 'center',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'flex-end',
     },
 });
 

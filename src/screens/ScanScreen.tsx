@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator, Image, Platform, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator, Image, Platform, Alert, Animated, PanResponder, Dimensions } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useThemeColors, SPACING, SHADOWS } from '../theme';
-import { X, CheckCircle, XCircle, MapPin } from 'lucide-react-native';
 import { Button } from '../components/Button';
 import { BlurView } from 'expo-blur';
-import { accessApi } from '../api';
+import { accessApi, storage } from '../api';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const ScanScreen = ({ navigation }: any) => {
     const [permission, requestPermission] = useCameraPermissions();
@@ -15,13 +15,60 @@ const ScanScreen = ({ navigation }: any) => {
     const [checkInLoading, setCheckInLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const colors = useThemeColors();
+    const screenHeight = Dimensions.get('window').height;
+    const slideAnim = useRef(new Animated.Value(screenHeight)).current;
+
+    useEffect(() => {
+        if (result) {
+            slideAnim.setValue(screenHeight); // Ensure effective reset
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 5
+            }).start();
+        }
+    }, [result]);
+
+    const resetScan = () => {
+        Animated.timing(slideAnim, {
+            toValue: screenHeight,
+            duration: 250,
+            useNativeDriver: true
+        }).start(() => {
+            setScanned(false);
+            setResult(null);
+            setLoading(false);
+            setScannedCode('');
+        });
+    };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dy > 0) {
+                    slideAnim.setValue(gestureState.dy);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                if (gestureState.dy > 100) {
+                    resetScan();
+                } else {
+                    Animated.spring(slideAnim, {
+                        toValue: 0,
+                        useNativeDriver: true
+                    }).start();
+                }
+            }
+        })
+    ).current;
 
     const [scannedCode, setScannedCode] = useState<string>('');
 
+    // Removed old useEffect for permission
     useEffect(() => {
-        if (permission && !permission.granted) {
-            requestPermission();
-        }
+        if (permission && !permission.granted) requestPermission();
     }, [permission]);
 
     const handleBarCodeScanned = async ({ data }: { data: string }) => {
@@ -41,6 +88,8 @@ const ScanScreen = ({ navigation }: any) => {
                         name: response.visitor_name || 'Unknown Visitor',
                         destination: response.resident_name ? `Visiting: ${response.resident_name}` : 'Unknown Destination',
                         // validUntil: response.valid_until
+                        photoUrl: null, // API doesn't return this yet
+                        vehiclePlate: null // API doesn't return this yet
                     }
                 });
             } else {
@@ -60,6 +109,14 @@ const ScanScreen = ({ navigation }: any) => {
         setCheckInLoading(true);
         try {
             await accessApi.checkIn(scannedCode);
+
+            // Log Activity
+            await storage.addActivity({
+                type: 'SCAN',
+                title: 'Entry Verified',
+                subtitle: result?.details?.name ? `Visitor • ${result.details.name}` : 'Visitor Check-in'
+            });
+
             Alert.alert('Success', 'Visitor checked in!', [
                 { text: 'OK', onPress: () => navigation.goBack() }
             ]);
@@ -70,12 +127,6 @@ const ScanScreen = ({ navigation }: any) => {
         }
     };
 
-    const resetScan = () => {
-        setScanned(false);
-        setResult(null);
-        setLoading(false);
-        setScannedCode('');
-    };
 
     if (!permission) return <View />;
     if (!permission.granted) {
@@ -99,7 +150,7 @@ const ScanScreen = ({ navigation }: any) => {
             <View style={styles.overlay}>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
-                        <X color="#fff" size={24} />
+                        <Ionicons name="close" color="#fff" size={24} />
                     </TouchableOpacity>
                 </View>
 
@@ -118,13 +169,51 @@ const ScanScreen = ({ navigation }: any) => {
             </View>
 
             {/* Result Modal */}
-            <Modal visible={!!result} transparent animationType="slide">
-                <View style={styles.modalContainer}>
-                    <BlurView intensity={Platform.OS === 'ios' ? 20 : 0} style={StyleSheet.absoluteFill} tint="dark" />
-                    <View style={[styles.resultCard, { backgroundColor: colors.surface }]}>
+            <Modal
+                visible={!!result}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={resetScan}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={resetScan}
+                >
+                    <Animated.View
+                        style={[
+                            styles.resultCard,
+                            {
+                                backgroundColor: colors.surface,
+                                overflow: 'visible',
+                                transform: [{ translateY: slideAnim }]
+                            }
+                        ]}
+                        {...panResponder.panHandlers}
+                    >
+                        {/* Drag Handle */}
+                        <View style={{ width: '100%', alignItems: 'center', paddingVertical: 8 }}>
+                            <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+                        </View>
+
+                        {/* Close Button - Floating on top right */}
+                        <TouchableOpacity
+                            onPress={resetScan}
+                            style={{
+                                position: 'absolute',
+                                right: 12,
+                                top: 12,
+                                zIndex: 9999, // Super high
+                                backgroundColor: 'rgba(0,0,0,0.2)', // Subtle backing
+                                borderRadius: 20,
+                            }}
+                            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                        >
+                            <Ionicons name="close-circle" size={36} color="#fff" />
+                        </TouchableOpacity>
 
                         <View style={[styles.resultHeader, { backgroundColor: result?.valid ? colors.success : colors.danger }]}>
-                            {result?.valid ? <CheckCircle color="#fff" size={28} /> : <XCircle color="#fff" size={28} />}
+                            {result?.valid ? <Ionicons name="checkmark-circle" color="#fff" size={28} /> : <Ionicons name="close-circle" color="#fff" size={28} />}
                             <Text style={styles.resultTitle}>{result?.valid ? 'Access Granted' : 'Access Denied'}</Text>
                         </View>
 
@@ -142,11 +231,11 @@ const ScanScreen = ({ navigation }: any) => {
                             </View>
 
                             <View style={[styles.typeBadge, { backgroundColor: colors.surfaceHighlight }]}>
-                                <Text style={[styles.userType, { color: colors.primary }]}>{result?.type?.toUpperCase()}</Text>
+                                <Text style={[styles.userType, { color: colors.primary }]}>{result?.type?.toUpperCase() || 'VISITOR'}</Text>
                             </View>
 
                             <View style={styles.infoRow}>
-                                <MapPin size={16} color={colors.textSecondary} />
+                                <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
                                 <Text style={[styles.infoText, { color: colors.textSecondary }]}>{result?.details?.destination}</Text>
                             </View>
 
@@ -171,8 +260,8 @@ const ScanScreen = ({ navigation }: any) => {
                                 />
                             </View>
                         </View>
-                    </View>
-                </View>
+                    </Animated.View>
+                </TouchableOpacity>
             </Modal>
         </View>
     );
@@ -359,6 +448,18 @@ const styles = StyleSheet.create({
         borderRightWidth: 4,
         borderBottomRightRadius: 16,
     },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'flex-end',
+    },
+    closeScanButton: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        zIndex: 10,
+        padding: 4,
+    }
 });
 
 export default ScanScreen;

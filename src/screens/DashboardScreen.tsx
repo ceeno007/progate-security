@@ -4,8 +4,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, I
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useThemeColors, SPACING, SHADOWS } from '../theme';
 import { Button } from '../components/Button';
-import { Scan, LogOut, TriangleAlert, Search, ChevronRight, User, KeyRound, Settings, Car } from 'lucide-react-native';
-import { alertsApi, Alert as AlertType } from '../api';
+// import { Scan, LogOut, TriangleAlert, Search, ChevronRight, User, KeyRound, Settings, Car } from 'lucide-react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import Feather from 'react-native-vector-icons/Feather';
+import { alertsApi, Alert as AlertType, storage, ActivityLog } from '../api';
 
 if (Platform.OS === 'android') {
     if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -23,10 +25,12 @@ const DashboardScreen = ({ navigation }: any) => {
     const [sosList, setSosList] = useState<any[]>([]);
     const [alertExpanded, setAlertExpanded] = useState(true); // Default open if alert exists
     const [loadingAlerts, setLoadingAlerts] = useState(false);
+    const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-    const loadAlerts = async () => {
+    const loadData = async () => {
         setLoadingAlerts(true);
         try {
+            // 1. Load Alerts
             const alerts = await alertsApi.listAlerts();
             // Filter only active/responding alerts if the backend doesn't already
             const active = alerts.filter((a: AlertType) => a.status === 'ACTIVE' || a.status === 'RESPONDING');
@@ -58,8 +62,13 @@ const DashboardScreen = ({ navigation }: any) => {
             if (hasActive && !sosVisible) {
                 setSosVisible(true);
             }
+
+            // 2. Load Activity Logs
+            const logs = await storage.getActivity();
+            setActivityLogs(logs);
+
         } catch (error) {
-            console.error('Failed to load alerts', error);
+            console.error('Failed to load dashboard data', error);
         } finally {
             setLoadingAlerts(false);
             setRefreshing(false);
@@ -68,13 +77,13 @@ const DashboardScreen = ({ navigation }: any) => {
 
     const onRefresh = () => {
         setRefreshing(true);
-        loadAlerts();
+        loadData();
     };
 
     // Poll for alerts every 10 seconds
     useEffect(() => {
-        loadAlerts(); // Initial load
-        const interval = setInterval(loadAlerts, 10000);
+        loadData(); // Initial load
+        const interval = setInterval(loadData, 10000);
         return () => clearInterval(interval);
     }, []);
 
@@ -92,11 +101,19 @@ const DashboardScreen = ({ navigation }: any) => {
         const alertToAck = sosList[0];
         try {
             await alertsApi.updateAlertStatus(alertToAck.id, 'RESPONDING');
+
+            // Log Activity
+            await storage.addActivity({
+                type: 'ALERT',
+                title: 'SOS Responded',
+                subtitle: `Resident • ${alertToAck.name}`
+            });
+
             setSosVisible(false);
             Alert.alert('Acknowledged', 'Status updated to Responding');
-            loadAlerts(); // Refresh list
+            loadData(); // Refresh list
         } catch (error: any) {
-            Alert.alert('Error', 'Failed to update status: ' + error.message);
+            Alert.alert('Error', 'Failed to update status. Please try again.');
         }
     };
 
@@ -140,7 +157,7 @@ const DashboardScreen = ({ navigation }: any) => {
         <View style={styles.header}>
             <View>
                 <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-                    WEDNESDAY, 12 DECEMBER
+                    {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
                 </Text>
                 <Text style={[styles.screenTitle, { color: colors.text }]}>
                     Dashboard
@@ -150,7 +167,7 @@ const DashboardScreen = ({ navigation }: any) => {
                 style={[styles.avatar, { backgroundColor: colors.surfaceHighlight }]}
                 onPress={handleSettings}
             >
-                <Settings size={20} color={colors.textSecondary} />
+                <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
         </View>
     );
@@ -165,9 +182,10 @@ const DashboardScreen = ({ navigation }: any) => {
                         activeOpacity={0.9}
                     >
                         <View style={styles.alertHeaderContent}>
-                            <TriangleAlert color="#fff" size={20} />
+                            <Ionicons name="warning" color="#fff" size={20} />
                             <Text style={styles.alertText}>{activeAlerts} Active Panic Alert{activeAlerts > 1 ? 's' : ''}</Text>
-                            <ChevronRight
+                            <Ionicons
+                                name="chevron-forward"
                                 color="#fff"
                                 size={20}
                                 style={{ transform: [{ rotate: alertExpanded ? '90deg' : '0deg' }] }}
@@ -217,21 +235,21 @@ const DashboardScreen = ({ navigation }: any) => {
                 <View style={styles.gridRow}>
                     <ActionCard
                         title="Scan Entry"
-                        icon={<Scan />}
+                        icon={<Ionicons name="scan-outline" />}
                         variant="primary"
                         onPress={() => navigation.navigate('Scan')}
                         style={{ marginRight: SPACING.m }}
                     />
                     <ActionCard
                         title="Verify OTP"
-                        icon={<KeyRound />}
+                        icon={<Ionicons name="key-outline" />}
                         onPress={() => navigation.navigate('VerifyCode')}
                     />
                 </View>
                 <View style={[styles.gridRow, { marginTop: SPACING.m }]}>
                     <ActionCard
                         title="Check Vehicle"
-                        icon={<Car />}
+                        icon={<Ionicons name="car-sport-outline" />}
                         onPress={() => navigation.navigate('VehicleCheck')}
                         style={{ marginRight: SPACING.m }}
                     />
@@ -245,29 +263,46 @@ const DashboardScreen = ({ navigation }: any) => {
     const ActivitySection = () => (
         <>
             <Text style={[styles.sectionHeader, { color: colors.text, marginTop: isTablet ? 0 : SPACING.l }]}>Recent Activity</Text>
-            <View style={[styles.groupedListContainer, { backgroundColor: colors.surface }]}>
-                {[1, 2, 3, 4, 5, 6].map((item, index) => (
-                    <View key={item}>
-                        <View style={styles.listItem}>
-                            <View style={styles.listLeft}>
-                                <View style={[styles.listIcon, { backgroundColor: colors.surfaceHighlight }]}>
-                                    {item % 2 !== 0 ? <Scan size={16} color={colors.text} /> : <LogOut size={16} color={colors.text} />}
-                                </View>
-                                <View>
-                                    <Text style={[styles.listTitle, { color: colors.text }]}>
-                                        {item % 2 !== 0 ? 'Entry Verified' : 'Exit Logged'}
+
+            {activityLogs.length === 0 ? (
+                <View style={[styles.groupedListContainer, { backgroundColor: colors.surface, padding: SPACING.l, alignItems: 'center' }]}>
+                    <Text style={{ color: colors.textSecondary }}>No recent activity logged.</Text>
+                </View>
+            ) : (
+                <View style={[styles.groupedListContainer, { backgroundColor: colors.surface }]}>
+                    {activityLogs.map((item, index) => {
+                        let iconName = 'scan-outline';
+                        let iconColor = colors.text;
+
+                        if (item.type === 'VEHICLE') iconName = 'car-sport-outline';
+                        if (item.type === 'ALERT') { iconName = 'warning'; iconColor = colors.danger; }
+
+                        return (
+                            <View key={item.id || index}>
+                                <View style={styles.listItem}>
+                                    <View style={styles.listLeft}>
+                                        <View style={[styles.listIcon, { backgroundColor: colors.surfaceHighlight }]}>
+                                            <Ionicons name={iconName} size={16} color={iconColor} />
+                                        </View>
+                                        <View>
+                                            <Text style={[styles.listTitle, { color: colors.text }]}>
+                                                {item.title}
+                                            </Text>
+                                            <Text style={[styles.listSubtitle, { color: colors.textSecondary }]}>
+                                                {item.subtitle}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.listTime, { color: colors.textSecondary }]}>
+                                        {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </Text>
-                                    <Text style={[styles.listSubtitle, { color: colors.textSecondary }]}>
-                                        {item % 2 !== 0 ? 'Visitor • John Doe' : 'Resident • Toyo...'}
-                                    </Text>
                                 </View>
+                                {index < activityLogs.length - 1 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
                             </View>
-                            <Text style={[styles.listTime, { color: colors.textSecondary }]}>10:4{item} AM</Text>
-                        </View>
-                        {index < 5 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
-                    </View>
-                ))}
-            </View>
+                        );
+                    })}
+                </View>
+            )}
         </>
     );
 
@@ -276,39 +311,55 @@ const DashboardScreen = ({ navigation }: any) => {
             <StatusBar barStyle={colors.mode === 'dark' ? 'light-content' : 'dark-content'} />
 
             {/* SOS Full Screen Overlay */}
-            <Modal visible={sosVisible} animationType="slide" transparent={false}>
-                <View style={[styles.sosContainer, { backgroundColor: colors.danger }]}>
-                    <StatusBar barStyle="light-content" />
+            <Modal
+                visible={sosVisible}
+                animationType="slide"
+                transparent={true}
+                presentationStyle="pageSheet"
+                onRequestClose={() => setSosVisible(false)} // Android Back Button
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(220, 38, 38, 0.95)' }}>
+                    <View style={[styles.sosContainer, { backgroundColor: 'transparent' }]}>
+                        {/* Close Button */}
+                        <TouchableOpacity
+                            onPress={() => setSosVisible(false)}
+                            style={styles.closeSosButton}
+                        >
+                            <Ionicons name="close-circle" size={36} color="#fff" />
+                        </TouchableOpacity>
 
-                    <View style={styles.sosContent}>
-                        <View style={styles.sirenContainer}>
-                            <TriangleAlert size={80} color="#fff" />
+                        <StatusBar barStyle="light-content" />
+
+                        <View style={styles.sosContent}>
+                            <View style={styles.sirenContainer}>
+                                <Ionicons name="warning" size={80} color="#fff" />
+                            </View>
+
+                            <Text style={styles.sosTitle}>SOS ALERT</Text>
+                            <Text style={styles.sosSubtitle}>Resident requires immediate assistance</Text>
+
+                            <View style={styles.sosCard}>
+                                <Text style={styles.sosLabel}>RESIDENT</Text>
+                                <Text style={styles.sosValue}>{sosList.length > 0 ? sosList[0].name : "Loading..."}</Text>
+
+                                <View style={styles.divider} />
+
+                                <Text style={styles.sosLabel}>LOCATION</Text>
+                                <Text style={styles.sosValue}>{sosList.length > 0 ? sosList[0].address : "Unknown"}</Text>
+
+                                <View style={styles.divider} />
+
+                                <Text style={styles.sosLabel}>TIME</Text>
+                                <Text style={styles.sosValue}>{sosList.length > 0 ? sosList[0].time : "Just Now"}</Text>
+                            </View>
+
+                            <Button
+                                title="ACKNOWLEDGE & RESPOND"
+                                onPress={handleAcknowledgeSos}
+                                style={styles.acknowledgeButton}
+                                textStyle={{ color: colors.danger, fontWeight: '800' }}
+                            />
                         </View>
-
-                        <Text style={styles.sosTitle}>SOS ALERT</Text>
-                        <Text style={styles.sosSubtitle}>Resident requires immediate assistance</Text>
-
-                        <View style={styles.sosCard}>
-                            <Text style={styles.sosLabel}>RESIDENT</Text>
-                            <Text style={styles.sosValue}>{sosList.length > 0 ? sosList[0].name : "Loading..."}</Text>
-
-                            <View style={styles.divider} />
-
-                            <Text style={styles.sosLabel}>LOCATION</Text>
-                            <Text style={styles.sosValue}>{sosList.length > 0 ? sosList[0].address : "Unknown"}</Text>
-
-                            <View style={styles.divider} />
-
-                            <Text style={styles.sosLabel}>TIME</Text>
-                            <Text style={styles.sosValue}>{sosList.length > 0 ? sosList[0].time : "Just Now"}</Text>
-                        </View>
-
-                        <Button
-                            title="ACKNOWLEDGE & RESPOND"
-                            onPress={handleAcknowledgeSos}
-                            style={styles.acknowledgeButton}
-                            textStyle={{ color: colors.danger, fontWeight: '800' }}
-                        />
                     </View>
                 </View>
             </Modal>
@@ -563,6 +614,22 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 56,
         borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    closeSosButton: {
+        position: 'absolute',
+        top: SPACING.l,
+        right: SPACING.m,
+        zIndex: 10,
+        padding: 8,
+    },
+    miniButton: {
         shadowColor: "#000",
         shadowOffset: {
             width: 0,
@@ -609,7 +676,7 @@ const styles = StyleSheet.create({
         marginTop: SPACING.s,
         alignItems: 'flex-end',
     },
-    miniButton: {
+    miniButtonContent: {
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 8,
