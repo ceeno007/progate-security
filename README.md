@@ -4,6 +4,7 @@ A premium, high-security access control interface for ProGate Estate Management.
 
 ## Features
 - **Smart Access Scanner**: Verifies QR codes and Entry Codes instantly.
+- **Secure Login**: Biometric Authentication (Face ID / Touch ID) and Password support.
 - **Real-Time Dashboard**: Monitor active alerts, gate logs, and visitor stats.
 - **Emergency Response**: Receive and acknowledge panic alerts.
 - **Watchlist Lookup**: Manual search for residents and vehicles.
@@ -12,8 +13,9 @@ A premium, high-security access control interface for ProGate Estate Management.
 - **Framework**: React Native (Expo SDK 54)
 - **Navigation**: React Navigation Native Stack
 - **Styling**: Custom StyleSheet + Expo Linear Gradient + BlurView
-- **Icons**: Lucide React Native (Modern, consistent icon set)
+- **Icons**: React Native Vector Icons (Ionicons, Feather)
 - **Camera**: Expo Camera (CameraView)
+- **Auth**: Expo Local Authentication (Biometrics)
 
 ## Usage
 1. **Install Dependencies**:
@@ -28,6 +30,7 @@ A premium, high-security access control interface for ProGate Estate Management.
    - Press `a` for Android Emulator
    - Press `i` for iOS Simulator
    - Scan QR code with Expo Go app
+   - **Note for iOS Simulator**: To test Face ID, go to `Features > Face ID > Enrolled`.
 
 ## Configuration
 - Update `src/utils/constants.ts` or similar if you add environment variables.

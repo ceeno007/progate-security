@@ -5,7 +5,7 @@ import { ScreenWrapper } from '../components/ScreenWrapper';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useThemeColors, SPACING } from '../theme';
-import { ArrowRight, Fingerprint, ScanFace } from 'lucide-react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { authApi } from '../api';
 
 const LoginScreen = ({ navigation }: any) => {
@@ -17,12 +17,14 @@ const LoginScreen = ({ navigation }: any) => {
 
     const isAndroid = Platform.OS === 'android';
     const biometricLabel = isAndroid ? 'Biometrics' : 'Face ID';
-    const BiometricIcon = isAndroid ? Fingerprint : ScanFace;
+    // Ionicons names
+    const biometricIconName = isAndroid ? 'finger-print' : 'scan-outline';
 
     useEffect(() => {
         (async () => {
             const compatible = await LocalAuthentication.hasHardwareAsync();
             const enrolled = await LocalAuthentication.isEnrolledAsync();
+            console.log('Biometrics Check:', { compatible, enrolled });
             setIsBiometricSupported(compatible && enrolled);
         })();
     }, []);
@@ -119,7 +121,7 @@ const LoginScreen = ({ navigation }: any) => {
                             title="Sign In"
                             onPress={handleLogin}
                             loading={loading}
-                            icon={<ArrowRight size={20} color={colors.textInverse} />}
+                            icon={<Ionicons name="arrow-forward" size={20} color={colors.textInverse} />}
                         />
 
                         {
@@ -129,7 +131,7 @@ const LoginScreen = ({ navigation }: any) => {
                                     variant="secondary"
                                     onPress={handleBiometricAuth}
                                     style={styles.biometricButton}
-                                    icon={<BiometricIcon size={20} color={colors.text} />}
+                                    icon={<Ionicons name={biometricIconName} size={20} color={colors.text} />}
                                 />
                             )
                         }
