@@ -6,7 +6,7 @@ import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useThemeColors, SPACING } from '../theme';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { authApi } from '../api';
+import { authApi, storage } from '../api';
 
 const LoginScreen = ({ navigation }: any) => {
     const [email, setEmail] = useState('');
@@ -24,8 +24,9 @@ const LoginScreen = ({ navigation }: any) => {
         (async () => {
             const compatible = await LocalAuthentication.hasHardwareAsync();
             const enrolled = await LocalAuthentication.isEnrolledAsync();
-            console.log('Biometrics Check:', { compatible, enrolled });
-            setIsBiometricSupported(compatible && enrolled);
+            const token = await storage.getToken();
+            console.log('Biometrics Check:', { compatible, enrolled, hasToken: !!token });
+            setIsBiometricSupported(compatible && enrolled && !!token);
         })();
     }, []);
 
