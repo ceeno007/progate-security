@@ -1,4 +1,4 @@
 export const API_CONFIG = {
-    BASE_URL: 'https://security-api.progatehq.com/api/v1',
+    BASE_URL: 'https://security-api.progatehq.com',
     TIMEOUT: 10000,
 };
