@@ -7,6 +7,7 @@ interface Props {
     onPress: () => void;
     variant?: 'primary' | 'secondary' | 'danger' | 'outline' | 'ghost'; // Added ghost
     loading?: boolean;
+    disabled?: boolean;
     style?: ViewStyle;
     textStyle?: TextStyle;
     icon?: React.ReactNode;
@@ -17,6 +18,7 @@ export const Button: React.FC<Props> = ({
     onPress,
     variant = 'primary',
     loading = false,
+    disabled = false,
     style,
     textStyle,
     icon
@@ -50,7 +52,7 @@ export const Button: React.FC<Props> = ({
     return (
         <TouchableOpacity
             onPress={onPress}
-            disabled={loading}
+            disabled={loading || disabled}
             activeOpacity={0.7}
             style={[
                 styles.container,
@@ -58,8 +60,9 @@ export const Button: React.FC<Props> = ({
                     backgroundColor: getBackgroundColor(),
                     borderColor: isOutline ? colors.border : 'transparent',
                     borderWidth: isOutline ? 1.5 : 0,
+                    opacity: disabled ? 0.5 : 1,
                 },
-                variant === 'primary' && SHADOWS.medium, // only shadow on primary
+                variant === 'primary' && !disabled && SHADOWS.medium, // only shadow on primary if not disabled
                 style
             ]}
         >

@@ -6,6 +6,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import ScanScreen from '../screens/ScanScreen';
 import VerifyCodeScreen from '../screens/VerifyCodeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import VehicleCheckScreen from '../screens/VehicleCheckScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -39,6 +40,13 @@ export const AppNavigator = () => {
                 <Stack.Screen
                     name="Settings"
                     component={SettingsScreen}
+                    options={{
+                        animation: 'slide_from_right'
+                    }}
+                />
+                <Stack.Screen
+                    name="VehicleCheck"
+                    component={VehicleCheckScreen}
                     options={{
                         animation: 'slide_from_right'
                     }}

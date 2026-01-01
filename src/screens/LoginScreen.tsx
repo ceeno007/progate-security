@@ -6,10 +6,11 @@ import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useThemeColors, SPACING } from '../theme';
 import { ArrowRight, Fingerprint, ScanFace } from 'lucide-react-native';
+import { authApi } from '../api';
 
 const LoginScreen = ({ navigation }: any) => {
-    const [estateId, setEstateId] = useState('');
-    const [accessCode, setAccessCode] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [isBiometricSupported, setIsBiometricSupported] = useState(false);
     const colors = useThemeColors();
@@ -26,27 +27,50 @@ const LoginScreen = ({ navigation }: any) => {
         })();
     }, []);
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
+        if (!email || !password) {
+            Alert.alert('Missing Fields', 'Please enter both email and password.');
+            return;
+        }
+
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            await authApi.login({ email, password });
+
+            // Navigate to Main flow
             navigation.replace('Main');
-        }, 1500);
+        } catch (error: any) {
+            console.error('Login Error:', error);
+
+            let errorMessage = error.message || 'An unexpected error occurred.';
+
+            // Customize error message for common issues
+            if (errorMessage.includes('404') || errorMessage.includes('401')) {
+                errorMessage = 'Invalid email or password. Please try again.';
+            } else if (errorMessage.includes('Network request failed')) {
+                errorMessage = 'Please check your internet connection.';
+            }
+
+            Alert.alert('Login Failed', errorMessage);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleBiometricAuth = async () => {
         try {
             const result = await LocalAuthentication.authenticateAsync({
                 promptMessage: 'Authenticate to access ProGate',
-                fallbackLabel: 'Use Passcode',
+                fallbackLabel: 'Use Password',
             });
 
             if (result.success) {
+                // Ideally, we would need to retrieve stored credentials or efficient token validation here
+                // For now, redirecting to Main assuming session is valid or needs re-auth
                 navigation.replace('Main');
             }
         } catch (error) {
-            Alert.alert('Authentication Failed', 'Please use your access code.');
+            Alert.alert('Authentication Failed', 'Please use your password.');
         }
     };
 
@@ -65,24 +89,25 @@ const LoginScreen = ({ navigation }: any) => {
                         />
                         <Text style={[styles.title, { color: colors.text }]}>Sign in</Text>
                         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                            ProGate Security Console
+                            ProGate Security
                         </Text>
                     </View>
 
                     <View style={styles.form}>
                         <Input
-                            label="Estate ID"
-                            placeholder="e.g. LKG-001"
-                            value={estateId}
-                            onChangeText={setEstateId}
-                            autoCapitalize="characters"
+                            label="Email Address"
+                            placeholder="guard@progatehq.com"
+                            value={email}
+                            onChangeText={setEmail}
+                            autoCapitalize="none"
+                            keyboardType="email-address"
                             placeholderTextColor={colors.textSecondary}
                         />
                         <Input
-                            label="Access Code"
-                            placeholder="Enter your unique code"
-                            value={accessCode}
-                            onChangeText={setAccessCode}
+                            label="Password"
+                            placeholder="Enter your password"
+                            value={password}
+                            onChangeText={setPassword}
                             secureTextEntry
                             autoCapitalize="none"
                             placeholderTextColor={colors.textSecondary}
@@ -91,7 +116,7 @@ const LoginScreen = ({ navigation }: any) => {
                         <View style={styles.spacer} />
 
                         <Button
-                            title="Continue"
+                            title="Sign In"
                             onPress={handleLogin}
                             loading={loading}
                             icon={<ArrowRight size={20} color={colors.textInverse} />}

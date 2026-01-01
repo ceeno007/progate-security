@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, StatusBar, useWindowDimensions, Modal, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, StatusBar, useWindowDimensions, Modal, LayoutAnimation, Platform, UIManager, Alert } from 'react-native';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useThemeColors, SPACING, SHADOWS } from '../theme';
 import { Button } from '../components/Button';
-import { Scan, LogOut, TriangleAlert, Search, ChevronRight, User, KeyRound, Settings } from 'lucide-react-native';
+import { Scan, LogOut, TriangleAlert, Search, ChevronRight, User, KeyRound, Settings, Car } from 'lucide-react-native';
+import { alertsApi, Alert as AlertType } from '../api';
 
 if (Platform.OS === 'android') {
     if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -20,11 +22,61 @@ const DashboardScreen = ({ navigation }: any) => {
     const [sosVisible, setSosVisible] = useState(false);
     const [sosList, setSosList] = useState<any[]>([]);
     const [alertExpanded, setAlertExpanded] = useState(true); // Default open if alert exists
+    const [loadingAlerts, setLoadingAlerts] = useState(false);
+
+    const loadAlerts = async () => {
+        setLoadingAlerts(true);
+        try {
+            const alerts = await alertsApi.listAlerts();
+            // Filter only active/responding alerts if the backend doesn't already
+            const active = alerts.filter((a: AlertType) => a.status === 'ACTIVE' || a.status === 'RESPONDING');
+
+            // sort: ACTIVE first, then descending time (newest first assuming created_at)
+            active.sort((a: AlertType, b: AlertType) => {
+                // Primary sort: 'ACTIVE' alerts come before 'RESPONDING' alerts
+                if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
+                if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1;
+
+                // Secondary sort: if statuses are the same, sort by created_at descending (newest first)
+                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                return dateB - dateA; // Descending order
+            });
+
+            setSosList(active.map((a: AlertType) => ({
+                id: a.id,
+                name: a.resident_name,
+                address: a.description, // Mapping description to address/location field
+                time: a.created_at ? new Date(a.created_at).toLocaleTimeString() : 'Now',
+                original: a
+            })));
+
+            setActiveAlerts(active.length);
+
+            // Automatically show SOS modal if there is an ACTIVE (unacknowledged) alert
+            const hasActive = active.some((a: AlertType) => a.status === 'ACTIVE');
+            if (hasActive && !sosVisible) {
+                setSosVisible(true);
+            }
+        } catch (error) {
+            console.error('Failed to load alerts', error);
+        } finally {
+            setLoadingAlerts(false);
+            setRefreshing(false);
+        }
+    };
 
     const onRefresh = () => {
         setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 2000);
+        loadAlerts();
     };
+
+    // Poll for alerts every 10 seconds
+    useEffect(() => {
+        loadAlerts(); // Initial load
+        const interval = setInterval(loadAlerts, 10000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleSettings = () => {
         navigation.navigate('Settings');
@@ -35,39 +87,17 @@ const DashboardScreen = ({ navigation }: any) => {
         setAlertExpanded(!alertExpanded);
     };
 
-    // Simulate incoming SOS Push Notifications
-    useEffect(() => {
-        // First Alert
-        const timer1 = setTimeout(() => {
-            const newAlert = {
-                id: '1',
-                name: "Mr. Chioma Okeke",
-                address: "Block C, Flat 404",
-                time: "Just Now"
-            };
-            setSosList(prev => [newAlert, ...prev]);
-            setSosVisible(true);
-            setActiveAlerts(prev => prev + 1);
-        }, 5000);
-
-        // Second Alert (Simulated multiple)
-        const timer2 = setTimeout(() => {
-            const newAlert2 = {
-                id: '2',
-                name: "Mrs. Sarah Adebayo",
-                address: "Block A, Flat 102",
-                time: "1 min ago"
-            };
-            setSosList(prev => [newAlert2, ...prev]);
-            setActiveAlerts(prev => prev + 1);
-        }, 12000);
-
-        return () => { clearTimeout(timer1); clearTimeout(timer2); };
-    }, []);
-
-    const handleAcknowledgeSos = () => {
-        setSosVisible(false);
-        // Navigate to map or detail if needed
+    const handleAcknowledgeSos = async () => {
+        if (sosList.length === 0) return;
+        const alertToAck = sosList[0];
+        try {
+            await alertsApi.updateAlertStatus(alertToAck.id, 'RESPONDING');
+            setSosVisible(false);
+            Alert.alert('Acknowledged', 'Status updated to Responding');
+            loadAlerts(); // Refresh list
+        } catch (error: any) {
+            Alert.alert('Error', 'Failed to update status: ' + error.message);
+        }
     };
 
     const ActionCard = ({ title, icon, onPress, variant = 'standard', style }: any) => {
@@ -197,6 +227,16 @@ const DashboardScreen = ({ navigation }: any) => {
                         icon={<KeyRound />}
                         onPress={() => navigation.navigate('VerifyCode')}
                     />
+                </View>
+                <View style={[styles.gridRow, { marginTop: SPACING.m }]}>
+                    <ActionCard
+                        title="Check Vehicle"
+                        icon={<Car />}
+                        onPress={() => navigation.navigate('VehicleCheck')}
+                        style={{ marginRight: SPACING.m }}
+                    />
+                    {/* Placeholder for symmetry or future feature */}
+                    <View style={{ flex: 1 }} />
                 </View>
             </View>
         </>

@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator, Image, Platform, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useThemeColors, SPACING, SHADOWS } from '../theme';
 import { X, CheckCircle, XCircle, MapPin } from 'lucide-react-native';
 import { Button } from '../components/Button';
 import { BlurView } from 'expo-blur';
+import { accessApi } from '../api';
 
 const ScanScreen = ({ navigation }: any) => {
     const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [checkInLoading, setCheckInLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const colors = useThemeColors();
+
+    const [scannedCode, setScannedCode] = useState<string>('');
 
     useEffect(() => {
         if (permission && !permission.granted) {
@@ -24,31 +28,53 @@ const ScanScreen = ({ navigation }: any) => {
         if (scanned || loading) return;
         setScanned(true);
         setLoading(true);
+        setScannedCode(data);
 
-        // Mock API Call
-        console.log(`Scanned: ${data}`);
+        try {
+            const response = await accessApi.verifyCode(data);
 
-        setTimeout(() => {
-            // Mock Data
-            const mockResponse = {
-                valid: true,
-                type: 'visitor',
-                details: {
-                    name: 'John Doe',
-                    destination: 'Block A, Flat 5',
-                    photoUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
-                    vehiclePlate: 'LND-123-XY'
-                }
-            };
-            setResult(mockResponse);
+            if (response.valid) {
+                setResult({
+                    valid: true,
+                    type: 'visitor',
+                    details: {
+                        name: response.visitor_name || 'Unknown Visitor',
+                        destination: response.resident_name ? `Visiting: ${response.resident_name}` : 'Unknown Destination',
+                        // validUntil: response.valid_until
+                    }
+                });
+            } else {
+                setResult({
+                    valid: false,
+                    reason: response.message || 'Invalid Code'
+                });
+            }
+        } catch (error: any) {
+            setResult({ valid: false, reason: error.message || 'Scan Failed' });
+        } finally {
             setLoading(false);
-        }, 1500);
+        }
+    };
+
+    const handleCheckIn = async () => {
+        setCheckInLoading(true);
+        try {
+            await accessApi.checkIn(scannedCode);
+            Alert.alert('Success', 'Visitor checked in!', [
+                { text: 'OK', onPress: () => navigation.goBack() }
+            ]);
+        } catch (error: any) {
+            Alert.alert('Check-In Failed', error.message || 'Could not log entry.');
+        } finally {
+            setCheckInLoading(false);
+        }
     };
 
     const resetScan = () => {
         setScanned(false);
         setResult(null);
         setLoading(false);
+        setScannedCode('');
     };
 
     if (!permission) return <View />;
@@ -133,10 +159,8 @@ const ScanScreen = ({ navigation }: any) => {
                             <View style={styles.actions}>
                                 <Button
                                     title="Log Entry"
-                                    onPress={() => {
-                                        resetScan();
-                                        navigation.goBack();
-                                    }}
+                                    onPress={handleCheckIn}
+                                    loading={checkInLoading}
                                     style={styles.actionButton}
                                 />
                                 <Button

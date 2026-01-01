@@ -6,14 +6,16 @@ import { Button } from '../components/Button';
 import { useThemeColors, SPACING, SHADOWS } from '../theme';
 import { ChevronLeft, CheckCircle, XCircle, MapPin, Search } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
+import { accessApi } from '../api';
 
 const VerifyCodeScreen = ({ navigation }: any) => {
     const [code, setCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
+    const [checkInLoading, setCheckInLoading] = useState(false);
     const colors = useThemeColors();
 
-    const handleVerify = () => {
+    const handleVerify = async () => {
         if (!code) {
             Alert.alert('Error', 'Please enter a code');
             return;
@@ -21,29 +23,57 @@ const VerifyCodeScreen = ({ navigation }: any) => {
         setLoading(true);
         Keyboard.dismiss();
 
-        // Simulate API Call similar to ScanScreen
-        setTimeout(() => {
-            // Mock Data
-            const mockResponse = {
-                valid: true,
-                type: 'visitor',
-                details: {
-                    name: 'Jane Doe',
-                    destination: 'Block B, Flat 12',
-                    photoUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
-                    vehiclePlate: 'ABC-987-YZ'
-                }
-            };
+        try {
+            const response = await accessApi.verifyCode(code);
 
-            // Simulate invalid code for a specific string
-            if (code === '0000') {
-                setResult({ valid: false, reason: 'Expired Code' });
+            // Map API response to UI state structure
+            if (response.valid) {
+                setResult({
+                    valid: true,
+                    type: 'visitor', // Defaulting as API doesn't specify type yet
+                    details: {
+                        name: response.visitor_name || 'Unknown Visitor',
+                        destination: response.resident_name ? `Visiting: ${response.resident_name}` : 'Unknown Destination',
+                        // photoUrl: null, // API doesn't return photo yet
+                        // vehiclePlate: null, // API doesn't return plate on verify
+                        validUntil: response.valid_until
+                    }
+                });
             } else {
-                setResult(mockResponse);
+                setResult({
+                    valid: false,
+                    reason: response.message || 'Invalid or Expired Code'
+                });
             }
 
+        } catch (error: any) {
+            console.error('Verify Error:', error);
+            // Check for 404/400 explicitly if client throws them or just generic error
+            const message = error.message || 'Verification Failed';
+            setResult({ valid: false, reason: message });
+        } finally {
             setLoading(false);
-        }, 1500);
+        }
+    };
+
+    const handleCheckIn = async () => {
+        setCheckInLoading(true);
+        try {
+            await accessApi.checkIn(code);
+            Alert.alert('Success', 'Visitor checked in successfully', [
+                {
+                    text: 'OK', onPress: () => {
+                        setResult(null);
+                        setCode('');
+                        navigation.goBack();
+                    }
+                }
+            ]);
+        } catch (error: any) {
+            Alert.alert('Check-In Failed', error.message || 'Could not log entry.');
+        } finally {
+            setCheckInLoading(false);
+        }
     };
 
     const reset = () => {
@@ -142,9 +172,8 @@ const VerifyCodeScreen = ({ navigation }: any) => {
                                 {result?.valid && (
                                     <Button
                                         title="Log Entry"
-                                        onPress={() => {
-                                            navigation.goBack();
-                                        }}
+                                        onPress={handleCheckIn}
+                                        loading={checkInLoading}
                                         style={styles.actionButton}
                                     />
                                 )}
@@ -153,6 +182,7 @@ const VerifyCodeScreen = ({ navigation }: any) => {
                                     variant="outline"
                                     onPress={reset}
                                     style={styles.cancelButton}
+                                    disabled={checkInLoading}
                                 />
                             </View>
                         </View>
