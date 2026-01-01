@@ -9,10 +9,14 @@ interface LoginCredentials {
 interface LoginResponse {
     access_token: string;
     refresh_token: string;
-    token_type: string;
-    user_id: string;
-    estate_id: string;
-    role: string;
+    token_type?: string;
+    user: {
+        id: string;
+        name?: string;
+        role: string;
+        estate_id: string;
+        estate_name?: string;
+    };
 }
 
 export const authApi = {
@@ -27,9 +31,10 @@ export const authApi = {
         if (data.refresh_token) await storage.saveRefreshToken(data.refresh_token);
 
         const user = {
-            userId: data.user_id,
-            estateId: data.estate_id,
-            role: data.role
+            userId: data.user?.id || data.user_id,
+            estateId: data.user?.estate_id || data.estate_id,
+            estateName: data.user?.estate_name,
+            role: data.user?.role || data.role
         };
         await storage.saveUser(user);
 

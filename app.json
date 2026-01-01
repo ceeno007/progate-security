@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ceed1.progate-security"
+      "bundleIdentifier": "com.progatehq.security"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,13 +29,15 @@
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
       ],
-      "package": "com.ceed1.progatesecurity"
+      "package": "com.progatehq.security",
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font",
+      "expo-notifications",
       [
         "expo-local-authentication",
         {

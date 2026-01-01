@@ -36,7 +36,23 @@ export const storage = {
         return user ? JSON.parse(user) : null;
     },
 
-    // Activity Log Methods
+    // Biometric Preference
+    saveBiometricEnabled: async (enabled: boolean) => {
+        await SecureStore.setItemAsync('biometric_enabled', JSON.stringify(enabled));
+    },
+    getBiometricEnabled: async () => {
+        const val = await SecureStore.getItemAsync('biometric_enabled');
+        return val === 'true'; // parse boolean
+    },
+
+    // Theme Preference: 'light' | 'dark' | 'system'
+    saveThemePreference: async (theme: 'light' | 'dark' | 'system') => {
+        await SecureStore.setItemAsync('theme_preference', theme);
+    },
+    getThemePreference: async (): Promise<'light' | 'dark' | 'system'> => {
+        const val = await SecureStore.getItemAsync('theme_preference');
+        return (val as 'light' | 'dark' | 'system') || 'system';
+    },
     addActivity: async (log: Omit<ActivityLog, 'id' | 'timestamp'>) => {
         try {
             const existing = await storage.getActivity();

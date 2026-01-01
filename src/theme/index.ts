@@ -62,8 +62,22 @@ const LIGHT = {
 };
 
 export const useThemeColors = () => {
-    const scheme = useColorScheme();
-    return scheme === 'dark' ? DARK : LIGHT;
+    // Import dynamically to avoid circular dependency
+    const React = require('react');
+    let colorScheme: 'light' | 'dark' = 'light';
+
+    try {
+        // Try to use ThemeContext if available
+        const { useTheme } = require('../context/ThemeContext');
+        const theme = useTheme();
+        colorScheme = theme.colorScheme;
+    } catch {
+        // Fallback to system if ThemeContext not available
+        const { useColorScheme } = require('react-native');
+        colorScheme = useColorScheme() || 'light';
+    }
+
+    return colorScheme === 'dark' ? DARK : LIGHT;
 };
 
 // Deprecate direct usage of static COLORS if possible, or alias to default dark for now to prevent crash during refactor

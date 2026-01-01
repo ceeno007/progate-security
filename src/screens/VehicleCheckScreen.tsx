@@ -4,18 +4,19 @@ import { ScreenWrapper } from '../components/ScreenWrapper';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useThemeColors, SPACING } from '../theme';
-import { ChevronLeft, Car, Search, ShieldCheck, ShieldAlert } from 'lucide-react-native';
+import { ChevronLeft, Car, Search, ShieldCheck, ShieldAlert, Scan } from 'lucide-react-native';
 import { vehiclesApi, VehicleInfo, storage } from '../api';
 
 const VehicleCheckScreen = ({ navigation }: any) => {
-    const [plateNumber, setPlateNumber] = useState('');
+    const [vehicleCode, setVehicleCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<VehicleInfo | null>(null);
     const colors = useThemeColors();
 
-    const handleCheck = async () => {
-        if (!plateNumber) {
-            Alert.alert('Error', 'Please enter a plate number');
+    const handleCheck = async (code?: string) => {
+        const codeToCheck = code || vehicleCode;
+        if (!codeToCheck) {
+            Alert.alert('Error', 'Please enter a vehicle code or scan QR');
             return;
         }
 
@@ -24,7 +25,7 @@ const VehicleCheckScreen = ({ navigation }: any) => {
         Keyboard.dismiss();
 
         try {
-            const data = await vehiclesApi.checkPlate(plateNumber);
+            const data = await vehiclesApi.checkPlate(codeToCheck);
             setResult(data);
 
             // Log Activity
@@ -38,6 +39,16 @@ const VehicleCheckScreen = ({ navigation }: any) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleScanQR = () => {
+        // Navigate to scan screen with callback
+        navigation.navigate('Scan', {
+            onScanComplete: (code: string) => {
+                setVehicleCode(code);
+                handleCheck(code);
+            }
+        });
     };
 
     const StatusBadge = ({ status }: { status: string }) => {
@@ -79,23 +90,32 @@ const VehicleCheckScreen = ({ navigation }: any) => {
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <View style={styles.content}>
                     <Text style={[styles.instruction, { color: colors.textSecondary }]}>
-                        Enter vehicle plate number to verify access status.
+                        Enter vehicle access code or scan QR code to verify.
                     </Text>
 
                     <Input
-                        placeholder="Plate Number (e.g. ABC-123-XY)"
-                        value={plateNumber}
-                        onChangeText={(text) => setPlateNumber(text.toUpperCase())}
+                        placeholder="Vehicle Code (e.g. VH123456)"
+                        value={vehicleCode}
+                        onChangeText={(text) => setVehicleCode(text.toUpperCase())}
                         autoCapitalize="characters"
                         icon={<Car size={20} color={colors.textSecondary} />}
                     />
 
-                    <Button
-                        title="Check Status"
-                        onPress={handleCheck}
-                        loading={loading}
-                        style={{ marginTop: SPACING.s }}
-                    />
+                    <View style={styles.buttonRow}>
+                        <Button
+                            title="Check Status"
+                            onPress={() => handleCheck()}
+                            loading={loading}
+                            style={{ flex: 1, marginRight: SPACING.s }}
+                        />
+                        <Button
+                            title="Scan QR"
+                            variant="outline"
+                            onPress={handleScanQR}
+                            icon={<Scan size={20} color={colors.primary} />}
+                            style={{ flex: 1 }}
+                        />
+                    </View>
                 </View>
             </TouchableWithoutFeedback>
 
@@ -153,6 +173,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
         marginBottom: SPACING.l,
         textAlign: 'center',
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        gap: SPACING.s,
+        marginTop: SPACING.s,
     },
     loadingContainer: {
         marginTop: SPACING.xl,

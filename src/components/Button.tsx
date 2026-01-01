@@ -38,12 +38,16 @@ export const Button: React.FC<Props> = ({
 
     const getTextColor = () => {
         switch (variant) {
-            case 'primary': return colors.textInverse;
+            case 'primary':
+                // In dark mode: primary (white bg) should have black text
+                // In light mode: primary (black bg) should have white text
+                return colors.mode === 'dark' ? '#000000' : '#FFFFFF';
             case 'secondary': return colors.text;
             case 'danger': return '#fff';
             case 'outline': return colors.primary;
             case 'ghost': return colors.textSecondary;
-            default: return colors.textInverse;
+            default:
+                return colors.mode === 'dark' ? '#000000' : '#FFFFFF';
         }
     };
 

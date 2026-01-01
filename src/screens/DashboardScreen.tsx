@@ -26,11 +26,19 @@ const DashboardScreen = ({ navigation }: any) => {
     const [alertExpanded, setAlertExpanded] = useState(true); // Default open if alert exists
     const [loadingAlerts, setLoadingAlerts] = useState(false);
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+    const [estateName, setEstateName] = useState('Dashboard');
 
     const loadData = async () => {
         setLoadingAlerts(true);
         try {
-            // 1. Load Alerts
+            // 1. Load user data to get estate info
+            const user = await storage.getUser();
+            if (user && user.estateId) {
+                // Backend will provide estate_name in future - for now use Dashboard as fallback
+                setEstateName(user.estateName || 'Dashboard');
+            }
+
+            // 2. Load Alerts
             const alerts = await alertsApi.listAlerts();
             // Filter only active/responding alerts if the backend doesn't already
             const active = alerts.filter((a: AlertType) => a.status === 'ACTIVE' || a.status === 'RESPONDING');
@@ -63,7 +71,7 @@ const DashboardScreen = ({ navigation }: any) => {
                 setSosVisible(true);
             }
 
-            // 2. Load Activity Logs
+            // 3. Load Activity Logs
             const logs = await storage.getActivity();
             setActivityLogs(logs);
 
@@ -117,57 +125,76 @@ const DashboardScreen = ({ navigation }: any) => {
         }
     };
 
-    const ActionCard = ({ title, icon, onPress, variant = 'standard', style }: any) => {
+    const ActionCard = ({ title, icon, variant = 'secondary', onPress, style }: any) => {
         const isPrimary = variant === 'primary';
+
         return (
             <TouchableOpacity
                 onPress={onPress}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
                 style={[
                     styles.card,
                     {
                         backgroundColor: isPrimary ? colors.primary : colors.surface,
                         flex: 1,
-                        minHeight: 120, // Square-ish
+                        minHeight: 140,
                         justifyContent: 'space-between',
+                        padding: SPACING.l,
+                        borderWidth: isPrimary ? 0 : 1,
+                        borderColor: colors.border,
                     },
-                    !isPrimary && SHADOWS.small,
+                    isPrimary ? SHADOWS.medium : SHADOWS.small,
                     style
                 ]}
             >
-                <View style={styles.cardIconHeader}>
+                {/* Icon with circular background */}
+                <View style={[
+                    styles.cardIconContainer,
+                    {
+                        backgroundColor: isPrimary
+                            ? 'rgba(255,255,255,0.2)'
+                            : colors.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                    }
+                ]}>
                     {React.cloneElement(icon, {
-                        color: isPrimary ? colors.textInverse : colors.primary,
-                        size: 28
+                        color: isPrimary
+                            ? colors.mode === 'dark' ? '#000000' : '#FFFFFF'
+                            : colors.primary,
+                        size: 32
                     })}
                 </View>
-                <View>
-                    <Text style={[
-                        styles.cardTitle,
-                        { color: isPrimary ? colors.textInverse : colors.text }
-                    ]}>
-                        {title}
-                    </Text>
-                </View>
+
+                {/* Title */}
+                <Text style={[
+                    styles.cardTitle,
+                    {
+                        color: isPrimary
+                            ? colors.mode === 'dark' ? '#000000' : '#FFFFFF'
+                            : colors.text
+                    }
+                ]}>
+                    {title}
+                </Text>
             </TouchableOpacity>
         );
     };
 
     const Header = () => (
         <View style={styles.header}>
-            <View>
+            <View style={styles.headerContent}>
                 <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-                    {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
+                    {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </Text>
-                <Text style={[styles.screenTitle, { color: colors.text }]}>
-                    Dashboard
+                <Text style={[styles.screenTitle, { color: colors.text }]} numberOfLines={2} ellipsizeMode="tail">
+                    {estateName}
                 </Text>
             </View>
             <TouchableOpacity
-                style={[styles.avatar, { backgroundColor: colors.surfaceHighlight }]}
+                style={[styles.settingsButton, { backgroundColor: colors.surfaceHighlight }]}
                 onPress={handleSettings}
+                activeOpacity={0.7}
             >
-                <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
+                <Ionicons name="settings-outline" size={24} color={colors.text} />
             </TouchableOpacity>
         </View>
     );
@@ -222,13 +249,7 @@ const DashboardScreen = ({ navigation }: any) => {
                 </View>
             )}
 
-            <View style={[styles.statusWidget, { backgroundColor: colors.surface }, SHADOWS.small]}>
-                <View style={styles.statusRow}>
-                    <View style={[styles.statusIndicator, { backgroundColor: colors.success }]} />
-                    <Text style={[styles.statusText, { color: colors.text }]}>Main Gate Active</Text>
-                </View>
-                <Text style={[styles.estateLabel, { color: colors.textSecondary }]}>Lekki Gardens Estate</Text>
-            </View>
+
 
             <Text style={[styles.sectionHeader, { color: colors.text }]}>Actions</Text>
             <View style={styles.gridContainer}>
@@ -410,26 +431,32 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: SPACING.l,
+        marginBottom: SPACING.xl,
+        paddingTop: SPACING.s,
+    },
+    headerContent: {
+        flex: 1,
+        marginRight: SPACING.m,
     },
     dateText: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '600',
         marginBottom: 4,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
     },
     screenTitle: {
         fontSize: 34,
-        fontWeight: 'bold',
-        letterSpacing: 0.3,
+        fontWeight: '700',
+        letterSpacing: 0.4,
+        lineHeight: 41,
     },
-    avatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20, // Circle
+    settingsButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
+        marginTop: 4,
     },
     alertBanner: {
         padding: SPACING.m,
@@ -481,16 +508,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     card: {
-        borderRadius: 24, // Apple style large rounding
-        padding: SPACING.m,
+        borderRadius: 20,
+        // Remove padding from here, it's in the component now
     },
-    cardIconHeader: {
-        marginBottom: SPACING.s,
-        alignItems: 'flex-start',
+    cardIconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: SPACING.m,
     },
     cardTitle: {
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '600',
+        letterSpacing: 0.2,
     },
     listButton: {
         flexDirection: 'row',

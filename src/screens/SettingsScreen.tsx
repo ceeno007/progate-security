@@ -1,15 +1,32 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Platform, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Platform, Alert, useColorScheme } from 'react-native';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useThemeColors, SPACING } from '../theme';
-import { ChevronLeft, Bell, Shield, LogOut, ChevronRight, Fingerprint, ScanFace } from 'lucide-react-native';
+import { ChevronLeft, Bell, Shield, LogOut, ChevronRight, Fingerprint, ScanFace, Sun, Moon, Smartphone } from 'lucide-react-native';
 import { Button } from '../components/Button';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { storage } from '../api/storage';
+import { useTheme } from '../context/ThemeContext';
 
 const SettingsScreen = ({ navigation }: any) => {
     const colors = useThemeColors();
+    const { themeMode, setThemeMode } = useTheme();
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-    const [biometricEnabled, setBiometricEnabled] = useState(true);
+    const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+    useEffect(() => {
+        // Load saved biometric preference
+        const loadPreferences = async () => {
+            const savedBiometric = await storage.getBiometricEnabled();
+            setBiometricEnabled(savedBiometric);
+        };
+        loadPreferences();
+    }, []);
+
+    const handleThemeChange = async (theme: 'light' | 'dark' | 'system') => {
+        await setThemeMode(theme);
+        // Theme changes instantly - no restart needed!
+    };
 
     const isAndroid = Platform.OS === 'android';
     const biometricLabel = isAndroid ? 'Biometric Login' : 'Face ID Login';
@@ -32,6 +49,7 @@ const SettingsScreen = ({ navigation }: any) => {
 
                 if (result.success) {
                     setBiometricEnabled(true);
+                    await storage.saveBiometricEnabled(true);
                     Alert.alert('Success', `${biometricLabel} enabled.`);
                 } else {
                     // Start off if failed
@@ -45,6 +63,7 @@ const SettingsScreen = ({ navigation }: any) => {
             // User wants to DISABLE - usually safe to just do it, or ask for confirm?
             // Let's just disable it for now straightforwardly
             setBiometricEnabled(false);
+            await storage.saveBiometricEnabled(false);
         }
     };
 
@@ -63,7 +82,8 @@ const SettingsScreen = ({ navigation }: any) => {
                     value={value}
                     onValueChange={onToggle}
                     trackColor={{ false: colors.surfaceHighlight, true: colors.primary }}
-                    thumbColor="#fff"
+                    thumbColor={colors.mode === 'dark' ? '#000000' : '#FFFFFF'}
+                    ios_backgroundColor={colors.surfaceHighlight}
                 />
             ) : (
                 <View style={styles.itemRight}>
@@ -73,6 +93,41 @@ const SettingsScreen = ({ navigation }: any) => {
             )}
         </TouchableOpacity>
     );
+
+    const ThemeOption = ({ theme, label, icon }: { theme: 'light' | 'dark' | 'system', label: string, icon: any }) => {
+        const isSelected = themeMode === theme;
+
+        // In dark mode: selected = white bg with black text, unselected = gray bg with white text
+        // In light mode: selected = black bg with white text, unselected = gray bg with black text
+        const bgColor = isSelected ? colors.primary : colors.surfaceHighlight;
+        const textColor = isSelected
+            ? (colors.mode === 'dark' ? '#000000' : '#FFFFFF')
+            : colors.text;
+
+        return (
+            <TouchableOpacity
+                style={[
+                    styles.themeOption,
+                    {
+                        backgroundColor: bgColor,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                    }
+                ]}
+                onPress={() => handleThemeChange(theme)}
+            >
+                {React.cloneElement(icon, {
+                    size: 24,
+                    color: textColor,
+                })}
+                <Text style={[
+                    styles.themeLabel,
+                    { color: textColor }
+                ]}>
+                    {label}
+                </Text>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <ScreenWrapper>
@@ -90,6 +145,13 @@ const SettingsScreen = ({ navigation }: any) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
+
+                <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>APPEARANCE</Text>
+                <View style={styles.themeSection}>
+                    <ThemeOption theme="light" label="Light" icon={<Sun />} />
+                    <ThemeOption theme="dark" label="Dark" icon={<Moon />} />
+                    <ThemeOption theme="system" label="System" icon={<Smartphone />} />
+                </View>
 
                 <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>PREFERENCES</Text>
                 <View style={[styles.section, { backgroundColor: colors.surface }]}>
@@ -120,7 +182,7 @@ const SettingsScreen = ({ navigation }: any) => {
                 />
 
                 <Text style={[styles.version, { color: colors.textSecondary }]}>
-                    ProGate v1.0.0 (Build 240)
+                    Progate Security 1.0.0
                 </Text>
 
             </ScrollView>
@@ -183,6 +245,24 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: SPACING.xl,
         fontSize: 13,
+    },
+    themeSection: {
+        flexDirection: 'row',
+        gap: SPACING.m,
+        marginBottom: SPACING.m,
+    },
+    themeOption: {
+        flex: 1,
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: SPACING.m,
+        borderRadius: 12,
+        borderWidth: 2,
+        gap: SPACING.s,
+    },
+    themeLabel: {
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
 

@@ -14,6 +14,8 @@ export const apiClient = async (endpoint: string, options: RequestInit = {}) => 
         headers['Authorization'] = `Bearer ${token}`;
     }
 
+    console.log(`[API] Requesting ${endpoint}`, { hasToken: !!token, headers });
+
     try {
         const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, {
             ...options,

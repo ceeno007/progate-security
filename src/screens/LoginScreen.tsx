@@ -21,13 +21,26 @@ const LoginScreen = ({ navigation }: any) => {
     const biometricIconName = isAndroid ? 'finger-print' : 'scan-outline';
 
     useEffect(() => {
-        (async () => {
+        const checkBiometrics = async () => {
             const compatible = await LocalAuthentication.hasHardwareAsync();
             const enrolled = await LocalAuthentication.isEnrolledAsync();
             const token = await storage.getToken();
-            console.log('Biometrics Check:', { compatible, enrolled, hasToken: !!token });
-            setIsBiometricSupported(compatible && enrolled && !!token);
-        })();
+            const enabledInSettings = await storage.getBiometricEnabled();
+
+            console.log('Biometric check:', { compatible, enrolled, hasToken: !!token, enabledInSettings });
+
+            const shouldShowBiometric = compatible && enrolled && !!token && enabledInSettings;
+            setIsBiometricSupported(shouldShowBiometric);
+
+            // Auto-trigger biometric authentication if available
+            if (shouldShowBiometric) {
+                // Small delay to let the screen render first
+                setTimeout(() => {
+                    handleBiometricAuth();
+                }, 500);
+            }
+        };
+        checkBiometrics();
     }, []);
 
     const handleLogin = async () => {
