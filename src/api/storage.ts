@@ -53,6 +53,14 @@ export const storage = {
         const val = await SecureStore.getItemAsync('theme_preference');
         return (val as 'light' | 'dark' | 'system') || 'system';
     },
+
+    // Estate Logo URL
+    saveEstateLogo: async (logoUrl: string) => {
+        await SecureStore.setItemAsync('estate_logo', logoUrl);
+    },
+    getEstateLogo: async (): Promise<string | null> => {
+        return await SecureStore.getItemAsync('estate_logo');
+    },
     addActivity: async (log: Omit<ActivityLog, 'id' | 'timestamp'>) => {
         try {
             const existing = await storage.getActivity();

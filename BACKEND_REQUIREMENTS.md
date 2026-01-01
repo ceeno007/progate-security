@@ -17,7 +17,8 @@ The app uses a `Refresh Token` flow to enable Biometric Login (FaceID).
             "name": "...",
             "role": "SECURITY",
             "estate_id": "...",
-            "estate_name": "Lekki Gardens Estate"
+            "estate_name": "Lekki Gardens Estate",
+            "estate_logo_url": "https://yourcdn.com/estate-logo.png"
           }
         }
         ```

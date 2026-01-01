@@ -13,6 +13,7 @@ const LoginScreen = ({ navigation }: any) => {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [isBiometricSupported, setIsBiometricSupported] = useState(false);
+    const [estateLogo, setEstateLogo] = useState<string | null>(null);
     const colors = useThemeColors();
 
     const isAndroid = Platform.OS === 'android';
@@ -39,6 +40,10 @@ const LoginScreen = ({ navigation }: any) => {
                     handleBiometricAuth();
                 }, 500);
             }
+
+            // Load estate logo
+            const logo = await storage.getEstateLogo();
+            setEstateLogo(logo);
         };
         checkBiometrics();
     }, []);
@@ -98,11 +103,19 @@ const LoginScreen = ({ navigation }: any) => {
                     style={styles.content}
                 >
                     <View style={styles.header}>
-                        <Image
-                            source={require('../../assets/branding/logo.png')}
-                            style={styles.logo}
-                            resizeMode="contain"
-                        />
+                        {estateLogo ? (
+                            <Image
+                                source={{ uri: estateLogo }}
+                                style={styles.logo}
+                                resizeMode="contain"
+                            />
+                        ) : (
+                            <Image
+                                source={require('../../assets/branding/logo.png')}
+                                style={styles.logo}
+                                resizeMode="contain"
+                            />
+                        )}
                         <Text style={[styles.title, { color: colors.text }]}>Sign in</Text>
                         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                             ProGate Security

@@ -16,6 +16,7 @@ interface LoginResponse {
         role: string;
         estate_id: string;
         estate_name?: string;
+        estate_logo_url?: string;
     };
 }
 
@@ -37,6 +38,11 @@ export const authApi = {
             role: data.user?.role || data.role
         };
         await storage.saveUser(user);
+
+        // Save estate logo if provided
+        if (data.user?.estate_logo_url) {
+            await storage.saveEstateLogo(data.user.estate_logo_url);
+        }
 
         return data;
     },
